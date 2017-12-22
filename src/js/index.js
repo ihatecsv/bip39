@@ -864,9 +864,28 @@
 		var url;
 		var parseMethod;
 		var coin = cointype.split(" -")[0];
+		
+		var balanceLocation = "#"+indexText+" > .balance > span";
+		
 		switch(coin){
 			case "BTC":
 				url = "https://api.blockcypher.com/v1/btc/main/addrs/" + address + "/balance";
+				parseMethod = function(d){
+					var bal = d.balance;
+					var adjBal = (bal/100000000) + coin;
+					return adjBal;
+				}
+				break;
+			case "LTC":
+				url = "https://api.blockcypher.com/v1/ltc/main/addrs/" + address + "/balance";
+				parseMethod = function(d){
+					var bal = d.balance;
+					var adjBal = (bal/100000000) + coin;
+					return adjBal;
+				}
+				break;
+			case "DOGE":
+				url = "https://api.blockcypher.com/v1/doge/main/addrs/" + address + "/balance";
 				parseMethod = function(d){
 					var bal = d.balance;
 					var adjBal = (bal/100000000) + coin;
@@ -882,13 +901,19 @@
 				}
 				break;
 			case "XRP":
-				break;
+				url = "https://data.ripple.com/v2/accounts/" + address + "/balances";
+				parseMethod = function(d){
+					var bal = d.balances[0].value;
+					var adjBal = (bal) + coin;
+					return adjBal;
+				}
 		}
 		if(url){
 			$.get(url).then(function(d){
 				var balance = parseMethod(d);
-				var balanceLocation = "#"+indexText+" > .balance > span";
 				$(balanceLocation).text(balance);
+			}).fail(function() {
+				$(balanceLocation).text(0 + coin + "?");
 			});
 		}
 	}
