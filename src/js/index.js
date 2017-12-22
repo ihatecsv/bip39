@@ -10,6 +10,7 @@
     var addressRowTemplate = $("#address-row-template");
 
     var showIndex = true;
+	var showBalance = true;
     var showAddress = true;
     var showPubKey = true;
     var showPrivKey = true;
@@ -89,6 +90,7 @@
     DOM.feedback = $(".feedback");
     DOM.tab = $(".derivation-type a");
     DOM.indexToggle = $(".index-toggle");
+	DOM.balanceToggle = $(".balance-toggle");
     DOM.addressToggle = $(".address-toggle");
     DOM.publicKeyToggle = $(".public-key-toggle");
     DOM.privateKeyToggle = $(".private-key-toggle");
@@ -122,6 +124,7 @@
         DOM.tab.on("shown.bs.tab", tabChanged);
         DOM.hardenedAddresses.on("change", calcForDerivationPath);
         DOM.indexToggle.on("click", toggleIndexes);
+		DOM.balanceToggle.on("click", toggleBalances);
         DOM.addressToggle.on("click", toggleAddresses);
         DOM.publicKeyToggle.on("click", togglePublicKeys);
         DOM.privateKeyToggle.on("click", togglePrivateKeys);
@@ -399,6 +402,11 @@
         showIndex = !showIndex;
         $("td.index span").toggleClass("invisible");
     }
+	
+    function toggleBalances() {
+        showBalance = !showBalance;
+        $("td.balance span").toggleClass("invisible");
+    }
 
     function toggleAddresses() {
         showAddress = !showAddress;
@@ -674,7 +682,9 @@
         DOM.extendedPubKey.val(extendedPubKey);
         // Display the addresses and privkeys
         clearAddressesList();
-        displayAddresses(0, 20);
+		
+		var rowsToAdd = parseInt(DOM.rowsToAdd.val());
+        displayAddresses(0, rowsToAdd);
     }
 
     function displayAddresses(start, total) {
@@ -781,7 +791,7 @@
                         address = bitcoinjs.bitcoin.address.fromOutputScript(scriptpubkey, network)
                     }
                 }
-                addAddressToList(indexText, address, pubkey, privkey);
+                addAddressToList(indexText, address, pubkey, privkey, networks[DOM.network.val()].name);
                 if (isLast) {
                     hidePending();
                 }
@@ -849,22 +859,67 @@
         DOM.bip44accountXprv.val("");
         DOM.bip44accountXpub.val("");
     }
+	
+	function getAddressBalance(indexText, address, cointype) {
+		var url;
+		var parseMethod;
+		var coin = cointype.split(" -")[0];
+		switch(coin){
+			case "BTC":
+				url = "https://api.blockcypher.com/v1/btc/main/addrs/" + address + "/balance";
+				parseMethod = function(d){
+					var bal = d.balance;
+					var adjBal = (bal/100000000) + coin;
+					return adjBal;
+				}
+				break;
+			case "ETH":
+				url = "https://api.etherscan.io/api?module=account&action=balance&address=" + address;
+				parseMethod = function(d){
+					var bal = d.result;
+					var adjBal = (bal/1000000000000000000) + coin;
+					return adjBal;
+				}
+				break;
+			case "XRP":
+				break;
+		}
+		if(url){
+			$.get(url).then(function(d){
+				var balance = parseMethod(d);
+				var balanceLocation = "#"+indexText+" > .balance > span";
+				$(balanceLocation).text(balance);
+			});
+		}
+	}
 
-    function addAddressToList(indexText, address, pubkey, privkey) {
+    function addAddressToList(indexText, address, pubkey, privkey, cointype) {
         var row = $(addressRowTemplate.html());
+		
         // Elements
         var indexCell = row.find(".index span");
+		var balanceCell = row.find(".balance span");
         var addressCell = row.find(".address span");
         var pubkeyCell = row.find(".pubkey span");
         var privkeyCell = row.find(".privkey span");
-        // Content
+		
+		// Get address balance
+		var safeIndex = indexText.replace(/\W/g, '');
+		row.attr("id", safeIndex);
+		var balance = getAddressBalance(safeIndex, address, cointype);
+        
+		// Content
         indexCell.text(indexText);
+		balanceCell.text(balance);
         addressCell.text(address);
         pubkeyCell.text(pubkey);
         privkeyCell.text(privkey);
         // Visibility
         if (!showIndex) {
             indexCell.addClass("invisible");
+        }
+		if (!showBalance) {
+            balanceCell.addClass("invisible");
         }
         if (!showAddress) {
             addressCell.addClass("invisible");
